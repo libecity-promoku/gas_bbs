@@ -6,7 +6,8 @@ GASとReactで作成した匿名の掲示板アプリです
 - フロントエンドは[React](https://ja.react.dev/) + [Materialize](https://materializecss.com/)
 
 ## デモ
-https://github.com/libecity-promoku/gas_bbs/assets/33917383/a39aed56-b774-4e9e-a2af-af9bfcd40666
+
+https://github.com/libecity-promoku/gas_bbs/assets/33917383/d1fd348f-3ac2-4933-8519-a8a763181748
 
 ## 使い方
 
