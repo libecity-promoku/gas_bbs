@@ -1,0 +1,196 @@
+<script type="text/babel">
+const {is_admin} = JSON.parse(document.querySelector('#prop').textContent);
+/** Promise版google.script.run */
+const gasRun = (func, ...args) => {
+  return new Promise((resolve, reject) => {
+    google
+      .script
+      .run
+      .withSuccessHandler((...result) => resolve(...result))
+      .withFailureHandler((...error) => reject(...error))
+    [func](...args);
+  });
+}
+
+// component : ごみ箱ボタン
+const TrashBtn = ({onClick, id, isLoading}) => {
+  if(!is_admin)
+    return null;
+
+  return (
+    <div className="right-align">
+      <button
+        className="btn-floating btn waves-effect waves-light red"
+        onClick={onClick}
+        disabled={isLoading}
+      >
+        <i className="material-icons">delete</i>
+      </button>
+    </div>
+  );
+};
+
+// component : 改行あり文字列
+const NewlineText = ({ text }) =>  {
+  const newText = text.split('\n').map((str, index, array) => (
+    <React.Fragment key={index}>
+      {str}
+      {index === array.length - 1 ? null : <br />}
+    </React.Fragment>
+  ));
+
+  return <p>{newText}</p>;
+};
+
+// component : カード
+const Card = ({isFix, id, time, body, onDelete, isLoading}) => {
+  return (
+    <div className="col s12 m4">
+      <div className={ `card card-stacked ${isFix ? "lime lighten-4" : ""}` }>
+        <div className="card-content">
+          { isFix ? '' : <span className="card-title"># {id}</span> }
+          <NewlineText text={ body } />
+          <span className="grey-text text-darken-1">{time}</span>
+        </div>
+        {isFix ? '' : <TrashBtn onClick={onDelete} id={id} isLoading={isLoading} />}
+      </div>
+    </div>
+  );
+};
+
+// component : テキスト入力エリア
+const TextArea = ({input, handleInputChange, handlePost, isLoading}) => {
+  return (
+    <React.Fragment>
+      <div className="row">
+        <div className="col s10 m10">
+          <div className="input-field">
+            <i className="material-icons prefix">mode_edit</i>
+            <textarea
+              className="materialize-textarea"
+              id="icon_preifx"
+              value={input}
+              onChange={handleInputChange}
+            />
+          </div>
+        </div>
+      </div>
+      <div className="row">
+        <div className="col s4 m4">
+          <a className="btn waves-effect waves-light"
+            onClick={handlePost}
+            disabled={isLoading}
+          >
+            POST<i className="material-icons right">send</i>
+          </a>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+};
+
+// component : チャット
+const Chat = () => {
+  const [talks, setTalks] = React.useState([]);
+  const [input, setInput] = React.useState('');
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  const fetch = async () => {
+    try {
+      const hashes = await gasRun('getTalk');
+      // 現在状態と異なる場合はstate更新
+      const ids = hashes.map((h) => h.id).sort().join('');
+      if(ids !== talks.map((t) => t.id).sort().join('')) {
+        console.log('fetch', hashes);
+        setTalks(hashes);
+      }
+    } catch(e) {
+      console.error('failed to fetch : ', e);
+    }
+  };
+
+  const deleteTalk = async (hash) => {
+    setIsLoading(true);
+    console.log('deleteTalk', hash);
+    await gasRun('deleteTalk', hash);
+    fetch();
+    setIsLoading(false);
+    //const new_talks = talks.filter((t) => t.id !== hash.id);
+    //setTalks(new_talks);
+  };
+
+  const addTalk = async (body) => {
+    setIsLoading(true);
+    console.log('addTalk', body);
+    await gasRun('addTalk', { body });
+    fetch();
+    setInput('');
+    setIsLoading(false);
+
+    //const [{ id: max_id }] = talks.slice(-1);
+    //const new_hash = {
+    //  id: (parseInt(max_id) + 1).toString(),
+    //  time: '',
+    //  body,
+    //};
+    //const new_talks = [ ...talks, new_hash ]
+    //setTalks(new_talks);
+  };
+
+  // テキストエリア更新ハンドラ
+  const handleInputChange = (e) => {
+    setInput(e.target.value);
+  };
+
+  // 送信ボタンクリックハンドラ
+  const handlePost = () => {
+    if(input.trim() === '')
+      return;
+
+    addTalk(input);
+  };
+
+  // 初期化
+  React.useEffect(() => {
+    fetch();
+
+    const interval_id = setInterval(fetch, 5000); // 5秒ごとにデータベースをポーリング
+    // コンポーネントがアンマウントされたときに、setIntervalをクリアします
+    return () => clearInterval(interval_id);
+  }, []);
+
+  return (
+    <div className="Chat">
+      <TextArea
+        input={input}
+        handleInputChange={handleInputChange}
+        handlePost={handlePost}
+        isLoading={isLoading}
+      />
+      <div className="row">
+        { // Fixフラグあり
+          [...talks.filter((t) => t.fix === 'TRUE')].map(talk => (
+          <Card
+            isFix={true}
+            key={talk.id}
+            {...talk}
+            isLoading={isLoading}
+          />
+        )) }
+      </div>
+      <div className="row">
+        { // Fixフラグなしで直近の20件
+          [...talks.filter((t) => t.fix !== 'TRUE').slice(-20)].reverse().map(talk => (
+          <Card
+            key={talk.id}
+            {...talk}
+            onDelete={() => deleteTalk(talk)}
+            isLoading={isLoading}
+          />
+        )) }
+      </div>
+    </div>
+  );
+};
+</script>
+
